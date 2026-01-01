@@ -1,7 +1,7 @@
 // 1. Import Express
 const express = require('express');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // 2. Import Firebase Admin SDK
 const admin = require('firebase-admin');
@@ -17,55 +17,65 @@ admin.initializeApp({
 // 5. Get a reference to the Firestore database
 const db = admin.firestore();
 
-// 6. Tell Express how to read data from a form
-// This middleware is for 'application/x-www-form-urlencoded' (our form)
+// 6. Middleware Setup
 app.use(express.urlencoded({ extended: true }));
-
-// This middleware is for 'application/json' (we'll need this later)
 app.use(express.json());
 
-// This middleware allows your server to be called from other websites (CORS)
+// CORS Middleware
 app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow any website to call
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
 
-// 7. Create a "route" for the homepage (/)
+// 7. Homepage Route
 app.get('/', (req, res) => {
-  res.send('Our backend server (with database!) is running! 🚀');
+  res.send('Relzzy\'s Portfolio Backend is live! 🚀');
 });
 
-// 8. Create a new route that LISTENS for POST requests
-app.post('/submit-scam-form', async (req, res) => {
+/**
+ * 8. Updated "Contact" Route
+ * Changed from '/submit-scam-form' to '/contact'
+ */
+app.post('/contact', async (req, res) => {
     
-    // 'req.body' will contain the form data
-    const formData = req.body;
+    // Extracting the new professional fields from the request body
+    const { name, email, subject, message } = req.body;
+    
+    // Create a clean object to save, adding a timestamp for organization
+    const contactData = {
+        name,
+        email,
+        subject,
+        message,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp() // Good practice for sorting
+    };
     
     try {
-        // 9. SAVE the data to the database
-        // We create a new "document" (a new entry)
-        // inside a "collection" named "submissions"
-        const docRef = await db.collection('submissions').add(formData);
+        // 9. SAVE the data to a new collection named "contacts"
+        const docRef = await db.collection('contacts').add(contactData);
         
-        console.log("--- NEW SUBMISSION SAVED ---");
-        console.log("Document written with ID: ", docRef.id);
-        console.log(formData);
+        console.log("--- NEW MESSAGE RECEIVED ---");
+        console.log("Document ID: ", docRef.id);
+        console.log(`From: ${name} (${email})`);
         
-        // 10. *** THIS IS THE CHANGE ***
-        // Instead of redirecting, just send a "200 OK" success message.
-        // The new JavaScript in input.html will catch this.
-        res.status(200).json({ message: 'Data saved successfully!' });
+        // 10. Send success response back to the frontend
+        res.status(200).json({ 
+            success: true, 
+            message: 'Message sent! I\'ll get back to you soon.' 
+        });
 
     } catch (error) {
         console.error("Error adding document: ", error);
-        // Send a "500 Internal Server Error" message
-        res.status(500).json({ message: 'Error saving data' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error. Message could not be saved.' 
+        });
     }
 });
 
 // 11. Start the server
 app.listen(PORT, () => {
-  console.log(`Server is live and listening on http://localhost:${PORT}`);
+  console.log(`Server is live at http://localhost:${PORT}`);
 });
